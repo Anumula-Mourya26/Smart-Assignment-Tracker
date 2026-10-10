@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Smart Assignment Tracker</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="site-header dashboard-header">
+        <div class="container nav">
+            <a class="brand" href="dashboard.html">Smart Assignment Tracker</a>
+            <nav>
+                <span id="userLabel">User</span>
+                <button id="logoutButton" class="button link-button" type="button">Logout</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container dashboard">
+        <section id="message" class="message" role="alert" aria-live="polite"></section>
+
+        <section class="panel create-task-panel">
+            <div class="section-heading">
+                <h2>Create Task</h2>
+            </div>
+            <form id="createTaskForm" class="task-form" novalidate>
+                <div class="form-grid">
+                    <div>
+                        <label for="taskTitle">Task title</label>
+                        <input id="taskTitle" name="title" type="text" maxlength="150" required>
+                    </div>
+                    <div>
+                        <label for="taskImportance">Importance</label>
+                        <select id="taskImportance" name="importance" required>
+                            <option value="">Select</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                        </select>
+                    </div>
+                    <div class="full-width">
+                        <label for="taskDescription">Description</label>
+                        <textarea id="taskDescription" name="description" rows="3" placeholder="Add task details"></textarea>
+                    </div>
+                    <div>
+                        <label for="taskDueDate">Due date</label>
+                        <input id="taskDueDate" name="due_date" type="date">
+                    </div>
+                </div>
+                <button class="button primary" type="submit">Create Task</button>
+            </form>
+        </section>
+
+        <section class="panel">
+            <div class="section-heading">
+                <h2>Task List</h2>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Description</th>
+                            <th>Importance</th>
+                            <th>Due date</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="taskList"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel priority-panel">
+            <div class="section-heading">
+                <h2>Highest Priority Task</h2>
+            </div>
+            <div id="priorityTask" class="priority-content">No incomplete task available.</div>
+        </section>
+
+        <section class="panel calendar-panel">
+            <div class="section-heading">
+                <h2>Calendar Importance</h2>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Total Importance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="calendarTable"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel collaborators-panel">
+            <div class="section-heading">
+                <h2>Collaborators</h2>
+            </div>
+            <div id="collaboratorTaskSection" class="collaborator-task-list"></div>
+        </section>
+    </main>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
