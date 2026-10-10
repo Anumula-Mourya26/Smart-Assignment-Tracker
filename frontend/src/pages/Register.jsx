@@ -126,7 +126,7 @@ export default function Register({ onNavigateToLogin, onRegisterSuccess }) {
               <input
                 type="text"
                 className="landing-input"
-                placeholder="Choose a username (e.g. mourya26)"
+                placeholder="Choose a username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 disabled={isLoading}
