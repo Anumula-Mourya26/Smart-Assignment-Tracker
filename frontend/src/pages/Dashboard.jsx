@@ -21,6 +21,7 @@ import TaskDetailView from '../components/TaskDetailView';
 import CalendarGrid from '../components/CalendarGrid';
 import PriorityPanel from '../components/PriorityPanel';
 import CreateTaskModal from '../components/CreateTaskModal';
+import CollaboratorInviteModal from '../components/CollaboratorInviteModal';
 import { api } from '../services/api';
 
 export default function Dashboard({ user, onLogout }) {
@@ -41,8 +42,10 @@ export default function Dashboard({ user, onLogout }) {
 
   // Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isInviteModalDismissed, setIsInviteModalDismissed] = useState(false);
+  const [lastSeenInviteCount, setLastSeenInviteCount] = useState(0);
 
-  // Filters for My Tasks view: 'all' | 'pending' | 'completed' | 'shared'
+  // Filters for My Tasks view: 'all' | 'active' | 'pending' | 'completed' | 'shared'
   const [taskCategory, setTaskCategory] = useState('all');
 
   const fetchTasks = useCallback(async () => {
@@ -111,6 +114,50 @@ export default function Dashboard({ user, onLogout }) {
     refreshAllData();
   }, [refreshAllData]);
 
+  // Periodic polling for incoming collaboration invites
+  useEffect(() => {
+    if (!user?.userId) return;
+    const interval = setInterval(() => {
+      fetchPendingRequests();
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [user?.userId, fetchPendingRequests]);
+
+  // When new collaboration requests arrive, re-open popup modal automatically
+  useEffect(() => {
+    if (pendingRequests.length > lastSeenInviteCount) {
+      setIsInviteModalDismissed(false);
+    }
+    setLastSeenInviteCount(pendingRequests.length);
+  }, [pendingRequests.length, lastSeenInviteCount]);
+
+  // Date and Overdue status helpers
+  const todayObj = new Date();
+  const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
+  const isTaskOverdue = (t) => Boolean(!t.completed && t.due_date && t.due_date !== 'null' && t.due_date < todayStr);
+
+  // Sorting function: Earliest due date first; on same day, sort by priority (importance) DESC
+  const sortTasksByDateAndPriority = (a, b) => {
+    if (!a.due_date && !b.due_date) {
+      return (Number(b.importance) || 0) - (Number(a.importance) || 0);
+    }
+    if (!a.due_date) return 1;
+    if (!b.due_date) return -1;
+
+    const dateDiff = a.due_date.localeCompare(b.due_date);
+    if (dateDiff !== 0) {
+      return dateDiff;
+    }
+
+    // Same day: highest priority at top (descending)
+    const priorityDiff = (Number(b.importance) || 0) - (Number(a.importance) || 0);
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
+    return (a.task_id || 0) - (b.task_id || 0);
+  };
+
   // Navigation handlers
   const handleTabSelect = (tab) => {
     setSelectedTaskId(null);
@@ -148,6 +195,8 @@ export default function Dashboard({ user, onLogout }) {
   // Metrics Calculations
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t) => t.completed).length;
+  const overdueUncompletedCount = tasks.filter(isTaskOverdue).length;
+  const activeTasksCount = tasks.filter((t) => !t.completed && !isTaskOverdue(t)).length;
   const pendingTasks = tasks.filter((t) => !t.completed).length;
   const tasksWithDueDates = tasks.filter((t) => t.due_date && t.due_date !== 'null').length;
   const sharedTasksCount = tasks.filter((t) => t.creator_id !== user?.userId).length;
@@ -157,27 +206,19 @@ export default function Dashboard({ user, onLogout }) {
     ? tasks.find((t) => t.task_id === selectedTaskId)
     : null;
 
-  // Next 5 Upcoming Tasks (for Dashboard)
+  // Next 5 Upcoming Tasks (for Dashboard) - strictly eliminates overdue uncompleted tasks and sorts same-day by priority DESC
   const upcomingTasks = [...tasks]
-    .filter((t) => !t.completed)
-    .sort((a, b) => {
-      if (!a.due_date && !b.due_date) return 0;
-      if (!a.due_date) return 1;
-      if (!b.due_date) return -1;
-      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-    })
+    .filter((t) => !t.completed && !isTaskOverdue(t))
+    .sort(sortTasksByDateAndPriority)
     .slice(0, 5);
 
-  // My Tasks list (strictly in chronological order of submission due dates)
-  const sortedTasksChronological = [...tasks].sort((a, b) => {
-    if (!a.due_date && !b.due_date) return 0;
-    if (!a.due_date) return 1;
-    if (!b.due_date) return -1;
-    return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-  });
+  // My Tasks list (strictly in chronological order of submission due dates, same-day sorted by priority DESC)
+  const sortedTasksChronological = [...tasks].sort(sortTasksByDateAndPriority);
 
+  // 5 Tabs filtering: 'all' | 'active' | 'pending' | 'completed' | 'shared'
   const filteredTasksForMyTasks = sortedTasksChronological.filter((task) => {
-    if (taskCategory === 'pending') return !task.completed;
+    if (taskCategory === 'active') return !task.completed && !isTaskOverdue(task);
+    if (taskCategory === 'pending') return isTaskOverdue(task);
     if (taskCategory === 'completed') return task.completed;
     if (taskCategory === 'shared') return task.creator_id !== user?.userId;
     return true; // 'all'
@@ -251,8 +292,8 @@ export default function Dashboard({ user, onLogout }) {
                   </p>
                 </div>
 
-                {/* Filter Categories: All, Active/Pending, Completed, Shared with Me */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#ffffff', padding: 4, borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                {/* 5 Filter Categories: All, Active, Pending, Completed, Shared */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#ffffff', padding: 4, borderRadius: 10, border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
                   <button
                     className={`btn btn-sm ${taskCategory === 'all' ? 'btn-secondary' : 'btn-outline'}`}
                     onClick={() => setTaskCategory('all')}
@@ -261,17 +302,41 @@ export default function Dashboard({ user, onLogout }) {
                     All ({totalTasks})
                   </button>
                   <button
+                    className={`btn btn-sm ${taskCategory === 'active' ? 'btn-secondary' : 'btn-outline'}`}
+                    onClick={() => setTaskCategory('active')}
+                    style={{
+                      border: 'none',
+                      fontWeight: 600,
+                      backgroundColor: taskCategory === 'active' ? '#4f46e5' : 'transparent',
+                      color: taskCategory === 'active' ? '#ffffff' : '#64748b',
+                    }}
+                  >
+                    Active ({activeTasksCount})
+                  </button>
+                  <button
                     className={`btn btn-sm ${taskCategory === 'pending' ? 'btn-secondary' : 'btn-outline'}`}
                     onClick={() => setTaskCategory('pending')}
-                    style={{ border: 'none', fontWeight: 600 }}
+                    style={{
+                      border: 'none',
+                      fontWeight: 600,
+                      backgroundColor: taskCategory === 'pending' ? (overdueUncompletedCount > 0 ? '#dc2626' : '#64748b') : 'transparent',
+                      color: taskCategory === 'pending' ? '#ffffff' : (overdueUncompletedCount > 0 ? '#dc2626' : '#64748b'),
+                    }}
                   >
-                    Active / Pending ({pendingTasks})
+                    {overdueUncompletedCount > 0 && <AlertCircle size={13} style={{ marginRight: 4, display: 'inline' }} />}
+                    Pending ({overdueUncompletedCount})
                   </button>
                   <button
                     className={`btn btn-sm ${taskCategory === 'completed' ? 'btn-secondary' : 'btn-outline'}`}
                     onClick={() => setTaskCategory('completed')}
-                    style={{ border: 'none', fontWeight: 600 }}
+                    style={{
+                      border: 'none',
+                      fontWeight: 600,
+                      backgroundColor: taskCategory === 'completed' ? '#10b981' : 'transparent',
+                      color: taskCategory === 'completed' ? '#ffffff' : '#64748b',
+                    }}
                   >
+                    <CheckCircle2 size={13} style={{ marginRight: 4, display: 'inline' }} />
                     Completed ({completedTasks})
                   </button>
                   <button
@@ -280,12 +345,12 @@ export default function Dashboard({ user, onLogout }) {
                     style={{
                       border: 'none',
                       fontWeight: 600,
-                      backgroundColor: taskCategory === 'shared' ? '#4f46e5' : 'transparent',
+                      backgroundColor: taskCategory === 'shared' ? '#7c3aed' : 'transparent',
                       color: taskCategory === 'shared' ? '#ffffff' : '#64748b',
                     }}
                   >
                     <Share2 size={13} style={{ marginRight: 4, display: 'inline' }} />
-                    Shared with Me ({sharedTasksCount})
+                    Shared ({sharedTasksCount})
                   </button>
                 </div>
               </div>
@@ -312,7 +377,13 @@ export default function Dashboard({ user, onLogout }) {
                   <p>
                     {taskCategory === 'shared'
                       ? 'No tasks have been shared with you by other users yet.'
-                      : `There are currently no ${taskCategory} tasks to show.`}
+                      : taskCategory === 'pending'
+                      ? 'No pending overdue tasks! All your ongoing tasks are on schedule.'
+                      : taskCategory === 'active'
+                      ? 'No active tasks found. You have completed all scheduled tasks or none exist.'
+                      : taskCategory === 'completed'
+                      ? 'No completed tasks yet. Finish a task to see it here.'
+                      : 'There are currently no tasks to display.'}
                   </p>
                 </div>
               )}
@@ -320,7 +391,7 @@ export default function Dashboard({ user, onLogout }) {
           ) : (
             /* DASHBOARD VIEW: Next 5 Upcoming Tasks, Collaboration Requests, Summary Metrics & Spotlight */
             <div>
-              {/* Summary Metrics Row */}
+              {/* Summary Metrics Row: 5 Cards with Extra Box for Uncompleted Past Deadline */}
               <section className="metrics-grid" style={{ marginBottom: 24 }}>
                 <div className="metric-card">
                   <div className="metric-icon-wrap indigo">
@@ -337,8 +408,8 @@ export default function Dashboard({ user, onLogout }) {
                     <Clock size={22} />
                   </div>
                   <div className="metric-info">
-                    <div className="metric-value">{pendingTasks}</div>
-                    <div className="metric-label">Pending Incomplete</div>
+                    <div className="metric-value">{activeTasksCount}</div>
+                    <div className="metric-label">Active on Schedule</div>
                   </div>
                 </div>
 
@@ -349,6 +420,39 @@ export default function Dashboard({ user, onLogout }) {
                   <div className="metric-info">
                     <div className="metric-value">{completedTasks}</div>
                     <div className="metric-label">Completed Tasks</div>
+                  </div>
+                </div>
+
+                {/* Extra Box: Count of Uncompleted Tasks Past Deadline */}
+                <div
+                  className="metric-card"
+                  style={{
+                    borderColor: overdueUncompletedCount > 0 ? '#fca5a5' : '#e2e8f0',
+                    backgroundColor: overdueUncompletedCount > 0 ? '#fff8f8' : '#ffffff',
+                  }}
+                >
+                  <div
+                    className="metric-icon-wrap rose"
+                    style={{
+                      backgroundColor: overdueUncompletedCount > 0 ? '#fee2e2' : '#f1f5f9',
+                      color: overdueUncompletedCount > 0 ? '#dc2626' : '#94a3b8',
+                    }}
+                  >
+                    <AlertCircle size={22} />
+                  </div>
+                  <div className="metric-info">
+                    <div
+                      className="metric-value"
+                      style={{ color: overdueUncompletedCount > 0 ? '#dc2626' : '#0f172a' }}
+                    >
+                      {overdueUncompletedCount}
+                    </div>
+                    <div
+                      className="metric-label"
+                      style={{ color: overdueUncompletedCount > 0 ? '#b91c1c' : '#64748b' }}
+                    >
+                      Uncompleted Past Deadline
+                    </div>
                   </div>
                 </div>
 
@@ -551,6 +655,15 @@ export default function Dashboard({ user, onLogout }) {
         onClose={() => setIsCreateOpen(false)}
         onSuccess={refreshAllData}
         currentUserId={user?.userId}
+      />
+
+      {/* Collaborator Invitation Popup Modal */}
+      <CollaboratorInviteModal
+        isOpen={pendingRequests.length > 0 && !isInviteModalDismissed}
+        requests={pendingRequests}
+        onAccept={handleAcceptRequest}
+        onDecline={handleDeclineRequest}
+        onClose={() => setIsInviteModalDismissed(true)}
       />
     </div>
   );

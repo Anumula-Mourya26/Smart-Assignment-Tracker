@@ -151,7 +151,7 @@ export const api = {
     return Array.isArray(data) ? data : [];
   },
 
-  async addCollaborator(taskId, collaboratorIdentifier, status = "ACCEPTED") {
+  async addCollaborator(taskId, collaboratorIdentifier, status = "PENDING") {
     const payload = {};
     if (typeof collaboratorIdentifier === "string" && collaboratorIdentifier.includes("@")) {
       payload.gmail = collaboratorIdentifier.trim();

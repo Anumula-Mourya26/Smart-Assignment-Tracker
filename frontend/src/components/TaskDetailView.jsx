@@ -133,8 +133,8 @@ export default function TaskDetailView({ task, currentUserId, onBack, onTaskUpda
 
     setIsAddingCollab(true);
     try {
-      await api.addCollaborator(currentTask.task_id, val, 'ACCEPTED');
-      showNotification('success', `Collaborator "${val}" added successfully!`);
+      await api.addCollaborator(currentTask.task_id, val, 'PENDING');
+      showNotification('success', `Collaboration invite sent to "${val}"! They will receive a popup invitation.`);
       setNewCollabInput('');
       const updatedCollabs = await api.getCollaboratorDetails(currentTask.task_id);
       setCollaborators(updatedCollabs);

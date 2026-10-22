@@ -8,7 +8,8 @@ import {
   Clock,
   ArrowRight,
   Flame,
-  Layers
+  Layers,
+  AlertCircle
 } from 'lucide-react';
 
 export default function CalendarGrid({ tasks = [], calendarData = {}, onOpenTask }) {
@@ -128,9 +129,14 @@ export default function CalendarGrid({ tasks = [], calendarData = {}, onOpenTask
     return `${year}-${m}-${d}`;
   };
 
+  const todayIsoStr = formatIsoDate(today.getFullYear(), today.getMonth(), today.getDate());
+
   const handleCellClick = (cellDateStr, dayTasks) => {
     setSelectedDateStr(cellDateStr);
-    setSelectedDayTasks(dayTasks);
+    const sorted = [...dayTasks].sort(
+      (a, b) => (Number(b.importance) || 0) - (Number(a.importance) || 0)
+    );
+    setSelectedDayTasks(sorted);
   };
 
   return (
@@ -227,6 +233,9 @@ export default function CalendarGrid({ tasks = [], calendarData = {}, onOpenTask
             <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <span style={{ width: 10, height: 10, borderRadius: 3, background: '#ec4899' }} /> High (7+)
             </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#dc2626', fontWeight: 600 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: '#ef4444' }} /> Overdue (Past Deadline)
+            </span>
           </div>
         </div>
       </div>
@@ -266,9 +275,12 @@ export default function CalendarGrid({ tasks = [], calendarData = {}, onOpenTask
           >
             {cells.map((cell, idx) => {
               const dateStr = formatIsoDate(cell.year, cell.month, cell.day);
-              const dayTasks = tasks.filter((t) => t.due_date === dateStr);
+              const dayTasks = tasks
+                .filter((t) => t.due_date === dateStr)
+                .sort((a, b) => (Number(b.importance) || 0) - (Number(a.importance) || 0));
               const workloadScore = calendarData[dateStr] || dayTasks.reduce((acc, t) => acc + (Number(t.importance) || 0), 0);
               const workloadStyle = getWorkloadStyle(workloadScore);
+              const hasOverdueTasks = dayTasks.some((t) => !t.completed && dateStr < todayIsoStr);
 
               const isTodayCell =
                 cell.year === today.getFullYear() &&
@@ -286,18 +298,26 @@ export default function CalendarGrid({ tasks = [], calendarData = {}, onOpenTask
                     padding: '8px 10px',
                     borderRadius: 10,
                     border: isSelected
-                      ? '2px solid #6366f1'
+                      ? (hasOverdueTasks ? '2px solid #ef4444' : '2px solid #6366f1')
+                      : hasOverdueTasks
+                      ? '1.5px solid #f87171'
                       : workloadStyle
                       ? `1.5px solid ${workloadStyle.border}`
                       : '1px solid #e2e8f0',
-                    backgroundColor: workloadStyle ? workloadStyle.bg : (cell.isCurrentMonth ? '#ffffff' : '#f8fafc'),
+                    backgroundColor: hasOverdueTasks
+                      ? '#fff5f5'
+                      : workloadStyle
+                      ? workloadStyle.bg
+                      : (cell.isCurrentMonth ? '#ffffff' : '#f8fafc'),
                     opacity: cell.isCurrentMonth ? 1 : 0.45,
                     cursor: dayTasks.length > 0 ? 'pointer' : 'default',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
                     transition: 'all 0.15s ease',
-                    boxShadow: isSelected ? '0 0 0 3px rgba(99, 102, 241, 0.15)' : 'none'
+                    boxShadow: isSelected
+                      ? (hasOverdueTasks ? '0 0 0 3px rgba(239, 68, 68, 0.15)' : '0 0 0 3px rgba(99, 102, 241, 0.15)')
+                      : 'none'
                   }}
                   onMouseEnter={(e) => {
                     if (cell.isCurrentMonth) e.currentTarget.style.transform = 'translateY(-2px)';
@@ -308,29 +328,43 @@ export default function CalendarGrid({ tasks = [], calendarData = {}, onOpenTask
                 >
                   {/* Cell Top Row: Date Number and Workload Score Pill */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span
-                      style={{
-                        fontWeight: isTodayCell ? 800 : 600,
-                        fontSize: '0.88rem',
-                        color: isTodayCell ? '#ffffff' : (cell.isCurrentMonth ? '#1e293b' : '#94a3b8'),
-                        backgroundColor: isTodayCell ? '#6366f1' : 'transparent',
-                        width: isTodayCell ? 24 : 'auto',
-                        height: isTodayCell ? 24 : 'auto',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {cell.day}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span
+                        style={{
+                          fontWeight: isTodayCell ? 800 : 600,
+                          fontSize: '0.88rem',
+                          color: isTodayCell ? '#ffffff' : (cell.isCurrentMonth ? '#1e293b' : '#94a3b8'),
+                          backgroundColor: isTodayCell ? '#6366f1' : 'transparent',
+                          width: isTodayCell ? 24 : 'auto',
+                          height: isTodayCell ? 24 : 'auto',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {cell.day}
+                      </span>
+                      {hasOverdueTasks && (
+                        <span
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: '50%',
+                            backgroundColor: '#ef4444',
+                            display: 'inline-block',
+                          }}
+                          title="Contains uncompleted overdue tasks"
+                        />
+                      )}
+                    </div>
 
                     {workloadScore > 0 && (
                       <span
                         className="badge"
                         style={{
-                          backgroundColor: workloadStyle.badgeBg,
-                          color: workloadStyle.badgeText,
+                          backgroundColor: hasOverdueTasks ? '#fee2e2' : workloadStyle.badgeBg,
+                          color: hasOverdueTasks ? '#b91c1c' : workloadStyle.badgeText,
                           fontSize: '0.7rem',
                           fontWeight: 700,
                           padding: '2px 6px',
@@ -348,38 +382,56 @@ export default function CalendarGrid({ tasks = [], calendarData = {}, onOpenTask
 
                   {/* Task Pills on this Day */}
                   <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {dayTasks.slice(0, 2).map((t) => (
-                      <div
-                        key={t.task_id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenTask(t);
-                        }}
-                        style={{
-                          fontSize: '0.72rem',
-                          fontWeight: 600,
-                          color: '#334155',
-                          backgroundColor: t.completed ? '#e2e8f0' : '#ffffff',
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          border: '1px solid #cbd5e1',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 4
-                        }}
-                        title={t.title}
-                      >
-                        <span style={{ color: '#f59e0b' }}>★{t.importance}</span>
-                        <span>{t.title}</span>
-                      </div>
-                    ))}
+                    {dayTasks.slice(0, 2).map((t) => {
+                      const isOverdue = !t.completed && dateStr < todayIsoStr;
+                      return (
+                        <div
+                          key={t.task_id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenTask(t);
+                          }}
+                          style={{
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            color: isOverdue ? '#991b1b' : '#334155',
+                            backgroundColor: isOverdue
+                              ? '#fee2e2'
+                              : t.completed
+                              ? '#e2e8f0'
+                              : '#ffffff',
+                            padding: '2px 6px',
+                            borderRadius: 4,
+                            border: isOverdue
+                              ? '1px solid #f87171'
+                              : '1px solid #cbd5e1',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}
+                          title={`${t.title}${isOverdue ? ' (Overdue uncompleted)' : ''}`}
+                        >
+                          {isOverdue ? (
+                            <AlertCircle size={10} color="#dc2626" style={{ flexShrink: 0 }} />
+                          ) : (
+                            <span style={{ color: '#f59e0b', flexShrink: 0 }}>★{t.importance}</span>
+                          )}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</span>
+                          {isOverdue && (
+                            <span style={{ color: '#dc2626', fontSize: '0.62rem', fontWeight: 700, marginLeft: 'auto', flexShrink: 0 }}>
+                              Overdue
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
 
                     {dayTasks.length > 2 && (
-                      <div style={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 600, textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.68rem', color: hasOverdueTasks ? '#dc2626' : '#64748b', fontWeight: 600, textAlign: 'right' }}>
                         +{dayTasks.length - 2} more
                       </div>
                     )}
@@ -406,29 +458,53 @@ export default function CalendarGrid({ tasks = [], calendarData = {}, onOpenTask
 
           {selectedDayTasks && selectedDayTasks.length > 0 ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-              {selectedDayTasks.map((task) => (
-                <div
-                  key={task.task_id}
-                  style={{
-                    padding: '12px 16px',
-                    borderRadius: 8,
-                    border: '1px solid #e2e8f0',
-                    backgroundColor: '#ffffff',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.92rem', color: '#0f172a' }}>
-                      {task.title}
+              {selectedDayTasks.map((task) => {
+                const isOverdue = !task.completed && selectedDateStr < todayIsoStr;
+                return (
+                  <div
+                    key={task.task_id}
+                    style={{
+                      padding: '12px 16px',
+                      borderRadius: 8,
+                      border: isOverdue ? '1.5px solid #fca5a5' : '1px solid #e2e8f0',
+                      backgroundColor: isOverdue ? '#fff5f5' : '#ffffff',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, fontSize: '0.92rem', color: isOverdue ? '#991b1b' : '#0f172a' }}>
+                          {task.title}
+                        </span>
+                        {isOverdue && (
+                          <span
+                            className="badge"
+                            style={{
+                              backgroundColor: '#fee2e2',
+                              color: '#dc2626',
+                              borderColor: '#fca5a5',
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3
+                            }}
+                          >
+                            <AlertCircle size={10} />
+                            Overdue
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, fontSize: '0.78rem', color: '#64748b' }}>
+                        <span style={{ color: '#f59e0b', fontWeight: 600 }}>Priority {task.importance}</span>
+                        <span>•</span>
+                        <span style={{ color: task.completed ? '#10b981' : isOverdue ? '#dc2626' : '#64748b', fontWeight: isOverdue ? 600 : 400 }}>
+                          {task.completed ? 'Completed' : isOverdue ? 'Uncompleted (Past Deadline)' : 'Pending'}
+                        </span>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, fontSize: '0.78rem', color: '#64748b' }}>
-                      <span style={{ color: '#f59e0b', fontWeight: 600 }}>Priority {task.importance}</span>
-                      <span>•</span>
-                      <span>{task.completed ? 'Completed' : 'Pending'}</span>
-                    </div>
-                  </div>
                   <button
                     className="btn btn-outline btn-sm"
                     onClick={() => onOpenTask(task)}
@@ -438,7 +514,8 @@ export default function CalendarGrid({ tasks = [], calendarData = {}, onOpenTask
                     <ArrowRight size={14} />
                   </button>
                 </div>
-              ))}
+              );
+            })}
             </div>
           ) : (
             <div style={{ color: '#64748b', fontSize: '0.88rem' }}>

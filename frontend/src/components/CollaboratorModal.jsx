@@ -50,8 +50,8 @@ export default function CollaboratorModal({ isOpen, onClose, task, onCollaborato
 
     setIsSubmitting(true);
     try {
-      await api.addCollaborator(task.task_id, targetId);
-      setSuccess(`User #${targetId} successfully added as collaborator!`);
+      await api.addCollaborator(task.task_id, targetId, 'PENDING');
+      setSuccess(`Collaboration request sent to User #${targetId}! They will receive a popup invitation.`);
       setCollabUserId('');
       await loadCollaborators();
       if (onCollaboratorAdded) {

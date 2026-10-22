@@ -359,9 +359,15 @@ body {
 /* Dashboard Summary Cards */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  gap: 16px;
   margin-bottom: 28px;
+}
+
+@media (min-width: 1200px) {
+  .metrics-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
 }
 
 .metric-card {
@@ -409,6 +415,11 @@ body {
 .metric-icon-wrap.sky {
   background-color: var(--info-bg);
   color: var(--info);
+}
+
+.metric-icon-wrap.rose {
+  background-color: #fee2e2;
+  color: #dc2626;
 }
 
 .metric-info .metric-value {

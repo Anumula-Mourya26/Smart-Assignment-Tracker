@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, Clock, Star, ArrowRight, CheckCircle2, ListChecks } from 'lucide-react';
+import { Calendar, Clock, Star, ArrowRight, CheckCircle2, ListChecks, AlertCircle } from 'lucide-react';
 
 export default function TaskCard({ task, onOpenTask, currentUserId }) {
   const getImportanceBadgeClass = (importance) => {
@@ -15,6 +15,10 @@ export default function TaskCard({ task, onOpenTask, currentUserId }) {
   const isOwner = currentUserId && task.creator_id === currentUserId;
   const ownerLabel = isOwner ? 'You' : (task.creator_username || task.creator_gmail || `User #${task.creator_id}`);
 
+  const todayObj = new Date();
+  const todayStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
+  const isOverdue = !task.completed && task.due_date && task.due_date < todayStr;
+
   const totalSubs = Number(task.subtasks_total) || 0;
   const doneSubs = Number(task.subtasks_completed) || 0;
   const progressPercent = totalSubs > 0 
@@ -23,9 +27,14 @@ export default function TaskCard({ task, onOpenTask, currentUserId }) {
 
   return (
     <div 
-      className={`task-card clickable ${task.completed ? 'completed' : ''}`}
+      className={`task-card clickable ${task.completed ? 'completed' : ''} ${isOverdue ? 'overdue' : ''}`}
       onClick={() => onOpenTask(task)}
-      style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
+      style={{
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        borderColor: isOverdue ? '#fca5a5' : undefined,
+        backgroundColor: isOverdue ? '#fffbfb' : undefined,
+      }}
     >
       <div className="task-card-header">
         <div className="task-title-group" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -109,9 +118,41 @@ export default function TaskCard({ task, onOpenTask, currentUserId }) {
             </span>
           )}
 
-          <span className={`badge badge-status ${task.completed ? 'completed' : 'pending'}`}>
-            {task.completed ? 'Completed' : 'Pending'}
-          </span>
+          {task.completed ? (
+            <span className="badge badge-status completed">Completed</span>
+          ) : isOverdue ? (
+            <span
+              className="badge badge-status"
+              style={{
+                backgroundColor: '#fee2e2',
+                color: '#dc2626',
+                borderColor: '#fca5a5',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontWeight: 700
+              }}
+            >
+              <AlertCircle size={12} />
+              Pending (Overdue)
+            </span>
+          ) : (
+            <span
+              className="badge badge-status"
+              style={{
+                backgroundColor: '#eff6ff',
+                color: '#2563eb',
+                borderColor: '#bfdbfe',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontWeight: 600
+              }}
+            >
+              <Clock size={12} />
+              Active
+            </span>
+          )}
 
           {task.due_date ? (
             <span className="badge-date">
